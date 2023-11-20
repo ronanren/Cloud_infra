@@ -47,6 +47,10 @@ resources:
 
   backend_security_group:
     type: OS::Neutron::SecurityGroup
+    properties:
+      rules:
+        - direction: ingress
+          protocol: icmp # ping
   
   frontend_port:
     type: OS::Neutron::Port
