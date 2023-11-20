@@ -1,0 +1,132 @@
+﻿heat_template_version: "2021-04-16"
+
+description: Template du projet Cloud Infra / Cloud Usage
+
+parameters:
+  image_id:
+    type: string
+  flavor:
+    type: string
+  ssh_key_name:
+    type: string
+  volume_size:
+    type: number
+    default: 2
+  router_external_gateway:
+    type: string
+  network_name:
+    type: string
+
+resources:
+  network:
+    type: OS::Neutron::Net
+    properties:
+      name: { get_param: network_name }
+
+  volume:
+    type: OS::Cinder::Volume
+    properties:
+      size: { get_param: volume_size }
+
+  frontend_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      rules:
+        - direction: ingress
+          port_range_min: 22
+          port_range_max: 22
+          protocol: tcp
+        - direction: ingress
+          port_range_min: 80
+          port_range_max: 80
+          protocol: tcp
+        - direction: ingress
+          port_range_min: 443
+          port_range_max: 443
+          protocol: tcp
+
+  backend_security_group:
+    type: OS::Neutron::SecurityGroup
+  
+  frontend_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: network }
+      security_groups: [ { get_resource: frontend_security_group } ]
+    depends_on: [network, frontend_security_group]
+
+  backend_port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_resource: network }
+      security_groups: [ { get_resource: backend_security_group } ]
+    depends_on: [network, backend_security_group]
+
+  router:
+    type: OS::Neutron::Router
+    properties:
+      external_gateway_info: { network: { get_param: router_external_gateway } }
+
+  subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: network }
+      cidr: 192.168.0.0/24
+
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router: { get_resource: router }
+      subnet: { get_resource: subnet }
+
+  frontend_vm:
+    type: OS::Nova::Server
+    properties:
+      image: { get_param: image_id }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: frontend_port }
+      user_data_format: RAW
+      user_data: |
+        #cloud-config
+        users:
+          - name: frontend
+            plain_text_passwd: password
+            home: /home/frontend
+            lock_passwd: false
+            shell: /bin/bash
+            groups: [sudo, docker]
+        final_message: “System is up”
+      
+  backend_vm:
+    type: OS::Nova::Server
+    properties:
+      image: { get_param: image_id }
+      flavor: { get_param: flavor }
+      key_name: { get_param: ssh_key_name }
+      networks:
+        - port: { get_resource: backend_port }
+      block_device_mapping:
+        - device_name: /dev/vdb
+          volume_id: { get_resource: volume }
+
+  floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: router_external_gateway }
+
+  associate_ip:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: floating_ip }
+      port_id: { get_resource: frontend_port }
+    depends_on: [router_interface, frontend_port, floating_ip]
+
+outputs:
+  frontend_ip:
+    description: IP flottante de la VM Frontend
+    value: { get_attr: [frontend_vm, first_address] }
+
+  backend_ip:
+    description: IP de la VM Backend
+    value: { get_attr: [backend_vm, first_address] }
