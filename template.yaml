@@ -54,7 +54,9 @@ resources:
     properties:
       rules:
         - direction: ingress
-          protocol: icmp # ping
+          port_range_min: 22
+          port_range_max: 22
+          protocol: tcp
   
   frontend_port:
     type: OS::Neutron::Port
@@ -105,8 +107,7 @@ resources:
             shell: /bin/bash
             groups: [sudo, docker]
         runcmd:
-          - 'git clone https://github.com/prashant-shahi/ToDo-List-using-Flask-and-MongoDB.git /home/frontend/app'
-          - 'cd /home/frontend/app && docker-compose up -d'
+          - 'git clone https://github.com/ronanren/ToDo-List-using-Flask-and-MongoDB.git /home/frontend/app && cd /home/frontend/app && docker-compose up -d'
 
 
   backend_vm:
