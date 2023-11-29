@@ -14,6 +14,12 @@ Pour mettre à jour l'infrastructure :
 openstack stack update -t template.yaml -e env.yaml --wait my_stack
 ```
 
+Pour supprimer l'infrastructure :
+
+```bash
+openstack stack delete my_stack
+```
+
 ## Interagir avec l'infrastructure
 
 ```bash
