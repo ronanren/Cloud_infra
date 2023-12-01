@@ -53,6 +53,16 @@ resources:
           port_range_min: 22
           port_range_max: 22
           protocol: tcp
+        - direction: ingress
+          port_range_min: 27017
+          port_range_max: 27017
+          protocol: tcp
+          
+  subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: network }
+      cidr: 192.168.0.0/24
   
   frontend_port:
     type: OS::Neutron::Port
@@ -65,6 +75,9 @@ resources:
     type: OS::Neutron::Port
     properties:
       network: { get_resource: network }
+      fixed_ips:
+        - subnet: { get_resource: subnet }
+          ip_address: 192.168.0.22
       security_groups: [ { get_resource: backend_security_group } ]
     depends_on: [network, backend_security_group]
 
@@ -72,12 +85,6 @@ resources:
     type: OS::Neutron::Router
     properties:
       external_gateway_info: { network: { get_param: router_external_gateway } }
-
-  subnet:
-    type: OS::Neutron::Subnet
-    properties:
-      network: { get_resource: network }
-      cidr: 192.168.0.0/24
 
   router_interface:
     type: OS::Neutron::RouterInterface
@@ -106,8 +113,9 @@ resources:
             shell: /bin/bash
             groups: [sudo, docker]
         runcmd:
-          - 'git clone https://github.com/ronanren/ToDo-List-using-Flask-and-MongoDB.git /home/frontend/app && cd /home/frontend/app && docker-compose up -d'
-
+          - 'git clone https://github.com/ronanren/ToDo-List-using-Flask-and-MongoDB.git /home/frontend/app'
+          - 'cd /home/frontend/app'
+          - 'docker-compose up -d todo-flaskapp'
 
   backend_vm:
     type: OS::Nova::Server
@@ -120,6 +128,20 @@ resources:
       block_device_mapping:
         - device_name: /dev/vdb
           volume_id: { get_resource: volume }
+      user_data_format: RAW
+      user_data: |
+        #cloud-config
+        users:
+          - name: backend
+            plain_text_passwd: password
+            home: /home/backend
+            lock_passwd: false
+            shell: /bin/bash
+            groups: [sudo, docker]
+        runcmd:
+          - 'git clone https://github.com/ronanren/ToDo-List-using-Flask-and-MongoDB.git /home/backend/app'
+          - 'cd /home/backend/app'
+          - 'docker-compose up -d mongo'
 
   floating_ip:
     type: OS::Neutron::FloatingIP
