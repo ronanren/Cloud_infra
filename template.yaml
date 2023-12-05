@@ -158,7 +158,11 @@ resources:
 outputs:
   frontend_ip:
     description: IP flottante de la VM Frontend
-    value: { get_attr: [frontend_vm, first_address] }
+    value: { get_attr: [floating_ip, floating_ip_address] }
+
+  site_url:
+    description: URL du site
+    value: { str_replace: { template: "var1var2", params: { var1: "http://", var2: { get_attr: [floating_ip, floating_ip_address] } } } }
 
   backend_ip:
     description: IP de la VM Backend
